@@ -1,0 +1,477 @@
+
+int contrast = 70;
+int i=0,x=0,puntaje=0;
+extern unsigned char SmallFont[];
+//extern unsigned char TinyFont[];
+//extern unsigned char MediumNumbers[];
+extern unsigned char BigNumbers[];
+extern uint8_t gg[];
+extern uint8_t g[];
+extern uint8_t g1[];
+extern uint8_t p1[];extern uint8_t pp1[];extern uint8_t pr1[];extern uint8_t prr1[];extern uint8_t prrr1[];
+extern uint8_t p2[];extern uint8_t pp2[];extern uint8_t pr2[];extern uint8_t prr2[];extern uint8_t prrr2[];
+extern uint8_t p3[];extern uint8_t pp3[];extern uint8_t pr3[];extern uint8_t prr3[];extern uint8_t prrr3[];
+extern uint8_t p4[];extern uint8_t pp4[];extern uint8_t pr4[];extern uint8_t prr4[];extern uint8_t prrr4[];
+extern uint8_t p5[];extern uint8_t pp5[];extern uint8_t pr5[];extern uint8_t  prr5[];
+extern uint8_t p6[];extern uint8_t pp6[];extern uint8_t pp10[];
+extern uint8_t zFIN2[];extern uint8_t zFIN[];
+extern uint8_t p7[];extern uint8_t pp7[];
+extern uint8_t p8[];extern uint8_t pp8[];extern uint8_t pr8[];extern uint8_t prr8[];extern uint8_t prrr8[];
+extern uint8_t p9[];extern uint8_t pp9[];extern uint8_t pr9[];extern uint8_t prr9[];extern uint8_t prrr9[];
+extern uint8_t exito1[];extern uint8_t exito2[];extern uint8_t exito3[];extern uint8_t exito4[];extern uint8_t exito5[];
+extern uint8_t Espera[];
+extern uint8_t ERRORX[];
+extern uint8_t avanza[];extern uint8_t retro[];
+void setup()
+{
+pinMode(A0, INPUT);
+pinMode(A1, INPUT);
+pinMode(A2, INPUT);
+pinMode(8, OUTPUT);pinMode(9, OUTPUT);pinMode(10, OUTPUT);pinMode(11, OUTPUT);pinMode(12, OUTPUT);pinMode(A4, OUTPUT);pinMode(A3, OUTPUT);pinMode(2, OUTPUT);
+digitalWrite(A4, LOW);//LA 4 ES LA PRIMERA
+digitalWrite(A3, LOW);
+digitalWrite(2, LOW);
+digitalWrite(8, LOW);
+digitalWrite(9, LOW);
+digitalWrite(10, LOW);
+digitalWrite(11, LOW);
+digitalWrite(12, LOW);
+Serial.begin(9600);
+myGLCD.InitLCD(contrast);
+//Precentacion 
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,g,84,48);
+myGLCD.update();
+delay(1000);
+//culturopolis
+for(i=0;i<4;i++){
+myGLCD.clrScr();
+delay(200);
+myGLCD.drawBitmap(0,0,g1,84,48);
+myGLCD.update();
+delay(100);
+myGLCD.clrScr();
+delay(200);
+myGLCD.drawBitmap(0,0,gg,84,48);
+myGLCD.update();
+delay(100);
+}
+}
+
+
+
+void loop()
+{
+  
+  
+if(x==0){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,p1,84,48);
+/*myGLCD.setFont(SmallFont);
+  myGLCD.print("PREGUNTA",CENTER,5);
+  myGLCD.print("NUMERO",14,20);
+   myGLCD.print("1",CENTER,40);*/
+    myGLCD.update();
+delay(1000);
+x++;
+}
+if(x==1){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pp1,84,48);
+myGLCD.update();
+delay(5000);
+x++;
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pr1,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prr1,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prrr1,84,48);
+myGLCD.update();
+delay(2500);
+Espera1();
+}
+if(x==2){
+  if(digitalRead(A0)==HIGH){exito();}
+ if(digitalRead(A1)==HIGH){ERRO();}
+ if(digitalRead(A2)==HIGH){ERRO();}}
+ 
+ 
+ //PREGUNTA 2------>
+if(x==3){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,p2,84,48);
+myGLCD.update();
+delay(1000);
+x++;
+}
+if(x==4){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pp2,84,48);
+myGLCD.update();
+delay(5000);
+x++;
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pr2,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prr2,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prrr2,84,48);
+myGLCD.update();
+delay(2500);
+Espera1();
+}
+if(x==5){
+  if(digitalRead(A0)==HIGH){ERRO();}
+ if(digitalRead(A1)==HIGH){ERRO();}
+ if(digitalRead(A2)==HIGH){exito();}}
+
+
+//PREGUNTA 3------>
+if(x==6){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,p2,84,48);
+myGLCD.update();
+delay(1000);
+x++;
+}
+if(x==7){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pp3,84,48);
+myGLCD.update();
+delay(5000);
+x++;
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pr3,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prr3,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prrr3,84,48);
+myGLCD.update();
+delay(2500);
+Espera1();
+}
+if(x==8){
+  if(digitalRead(A0)==HIGH){ERRO();}
+ if(digitalRead(A1)==HIGH){exito();}
+ if(digitalRead(A2)==HIGH){;ERRO();}}
+
+//PREGUNTA 4------>
+if(x==9){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,p2,84,48);
+myGLCD.update();
+delay(2000);
+x++;
+}
+if(x==10){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pp4,84,48);
+myGLCD.update();
+delay(5000);
+x++;
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pr4,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prr4,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prrr4,84,48);
+myGLCD.update();
+delay(2500);
+Espera1();
+}
+if(x==11){
+  if(digitalRead(A0)==HIGH){ERRO();}
+ if(digitalRead(A1)==HIGH){exito();}
+ if(digitalRead(A2)==HIGH){ERRO();}}
+
+ //PREGUNTA 5------>
+if(x==12){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,p2,84,48);
+myGLCD.update();
+delay(2000);
+x++;
+}
+if(x==13){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pp5,84,48);
+myGLCD.update();
+delay(5000);
+x++;
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pr5,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prr5,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prrr8,84,48);
+myGLCD.update();
+delay(2500);
+Espera1();
+}
+if(x==14){
+  if(digitalRead(A0)==HIGH){exito();}
+ if(digitalRead(A1)==HIGH){ERRO();}
+ if(digitalRead(A2)==HIGH){;ERRO();}}
+
+
+ //PREGUNTA 6------>
+if(x==15){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,p2,84,48);
+myGLCD.update();
+delay(2000);
+x++;
+}
+if(x==16){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pp6,84,48);
+myGLCD.update();
+delay(5000);
+x++;
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pr5,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prr5,84,48);
+myGLCD.update();
+delay(2500);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prrr8,84,48);
+myGLCD.update();
+delay(2000);
+Espera1();
+}
+if(x==17){
+  if(digitalRead(A0)==HIGH){ERRO();}
+ if(digitalRead(A1)==HIGH){exito();}
+ if(digitalRead(A2)==HIGH){;ERRO();}}
+
+ //PREGUNTA 7------>
+if(x==18){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,p2,84,48);
+myGLCD.update();
+delay(2000);
+x++;
+}
+if(x==19){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pp7,84,48);
+myGLCD.update();
+delay(5000);
+x++;
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pr5,84,48);
+myGLCD.update();
+delay(2000);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prr5,84,48);
+myGLCD.update();
+delay(2000);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prrr8,84,48);
+myGLCD.update();
+delay(2000);
+Espera1();
+}
+if(x==20){
+  if(digitalRead(A0)==HIGH){exito();}
+ if(digitalRead(A1)==HIGH){ERRO();}
+ if(digitalRead(A2)==HIGH){;ERRO();}}
+
+ //PREGUNTA 8------>
+if(x==21){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,p8,84,48);
+myGLCD.update();
+delay(2000);
+x++;
+}
+if(x==22){
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pp8,84,48);
+myGLCD.update();
+delay(5000);
+x++;
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,pr8,84,48);
+myGLCD.update();
+delay(2000);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prr8,84,48);
+myGLCD.update();
+delay(2000);
+
+myGLCD.clrScr();
+delay(700);
+myGLCD.drawBitmap(0,0,prrr8,84,48);
+myGLCD.update();
+delay(2000);
+Espera1();
+}
+if(x==23){
+  if(digitalRead(A0)==HIGH){exito();}
+ if(digitalRead(A1)==HIGH){ERRO();}
+ if(digitalRead(A2)==HIGH){ERRO();}}
+
+
+void Espera1(){
+  myGLCD.clrScr();
+delay(500);
+myGLCD.drawBitmap(0,0,Espera,84,48);
+myGLCD.update();
+delay(500);
+    }
+
+    void ERRO(){
+      puntaje--;
+     
+  myGLCD.clrScr();
+delay(500);
+myGLCD.drawBitmap(0,0,ERRORX,84,48);
+myGLCD.update();
+delay(1000);
+  myGLCD.clrScr();
+delay(500);
+myGLCD.drawBitmap(0,0,retro,84,48);
+myGLCD.update();
+delay(1000);
+x--;
+x--;
+if(puntaje==0){digitalWrite(A4,LOW);}
+if(puntaje==1){digitalWrite(A3, LOW);}
+if(puntaje==2){digitalWrite(2, LOW);}
+if(puntaje==3){digitalWrite(8, LOW);}
+if(puntaje==4){digitalWrite(9, LOW);}
+if(puntaje==5){digitalWrite(10, LOW);}
+if(puntaje==6){digitalWrite(11, LOW);}
+if(puntaje==7){digitalWrite(12, LOW);}
+    }
+    
+void exito(){
+  puntaje++;
+myGLCD.clrScr();
+delay(400);
+myGLCD.drawBitmap(0,0,exito1,84,48);
+myGLCD.update();
+delay(50);
+/*myGLCD.clrScr();
+delay(300);
+myGLCD.drawBitmap(0,0,exito2,84,48);
+myGLCD.update();
+delay(100);
+myGLCD.clrScr();
+delay(300);
+myGLCD.drawBitmap(0,0,exito3,84,48);
+myGLCD.update();
+delay(100);
+myGLCD.clrScr();
+delay(300);
+myGLCD.drawBitmap(0,0,exito4,84,48);
+myGLCD.update();
+delay(100);*/
+myGLCD.clrScr();
+delay(300);
+myGLCD.drawBitmap(0,0,exito5,84,48);
+myGLCD.update();
+delay(1000);
+myGLCD.clrScr();
+delay(500);
+myGLCD.drawBitmap(0,0,avanza,84,48);
+myGLCD.update();
+delay(580);
+x++;
+if(puntaje==1){digitalWrite(A4, HIGH);}
+if(puntaje==2){digitalWrite(A3, HIGH);}
+if(puntaje==3){digitalWrite(2, HIGH);}
+if(puntaje==4){digitalWrite(8, HIGH);}
+if(puntaje==5){digitalWrite(9, HIGH);}
+if(puntaje==6){digitalWrite(10, HIGH);}
+if(puntaje==7){digitalWrite(11, HIGH);}
+if(puntaje==8){digitalWrite(12, HIGH);}
+  }

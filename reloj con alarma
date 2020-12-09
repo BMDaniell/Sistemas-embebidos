@@ -1,0 +1,1013 @@
+#include <LiquidCrystal.h>
+  #include <DS3232RTC.h>      //http://github.com/JChristensen/DS3232RTC  
+  #include <Button.h>         //https://github.com/JChristensen/Button
+  #include <Streaming.h>        
+  #include <Time.h>         
+  #include <TimeLib.h>  
+  #include <Wire.h>           //http://arduino.cc/en/Reference/Wire (Incluida con el IDE de Arduino)
+  #include <EEPROM.h>
+                                             
+  LiquidCrystal lcd(12, 11, 10, 9, 8, 7);   
+  /*Conexion LCD -- Arduino:
+   *  LCD       Pin Arduino  
+   *   RS            12 
+   * Enable          11 
+   *   D4            10 
+   *   D5            9
+   *   D6            8  
+   *   D7            7 */
+
+  #define Atras       3    //Pulsador Atras  
+  #define Select_Menu 4    //Pulsador Select_Menu
+  #define Arriba      5    //Pulsador Arriba
+  #define Abajo       6    //Pulsador Abajo  
+
+
+  #define SQW_PIN 2                //Pin de Interrupcion de la alarma
+
+  #define Rebote_ms 20             //Tiempo de rebote de 20 milisegundo para los pulsadores
+  
+  #define Primera_Repeticion 1000  //Tiempo requerido en una pulsación larga en "ms"
+  #define Repetir_Increment  200   //Intervalo de repición para una pulsacion larga
+  #define PULLUP true              //Resistencia interna de PULLUP
+  #define INVERT true
+
+  unsigned long Repeticion = Primera_Repeticion;  //Tiempo para manejar las repeticiones en pulsaciones larga
+
+  // --Declaracón de pulsadores-- //
+  Button Pulsa_Arriba(Arriba, PULLUP, INVERT, Rebote_ms);    
+  Button Pulsa_Abajo(Abajo, PULLUP, INVERT, Rebote_ms);
+  Button Pulsa_Selector(Select_Menu, PULLUP, INVERT, Rebote_ms);
+  Button Pulsa_Atras(Atras, PULLUP, INVERT, Rebote_ms);
+
+  // -- Acciones de entrada-- //
+  enum {Pulsador_Arriba, Pulsador_Abajo, Pulsador_Menu, Pulsador_Atras};
+
+  //== Estados de la Maquina de Estado ==//
+  enum ESTADOS{
+   PRINCIPAL, SEL_MENU_ALARMA, SEL_MENU_HORA, SEL_MENU_FECHA, MENU_LUZ_FONDO, 
+
+   SEL_DIAS, SEL_MES, SEL_YEAR,
+
+   SEL_HORA, SEL_MINUTOS,
+
+   SEL_HORA_ALARMA, SEL_MINUTO_ALARMA, SEL_ON_OFF_ALARMA, TIEMPO_ALARMA, SEL_LUZ_FONDO, };
+                   
+
+  ESTADOS estado;       // Se mantienes el estado actual del sistema
+
+  int8_t Pulsador;                             
+  int8_t Presionar;                            
+
+  int Segundo;                         
+  int Minuto;
+  int Hora;     
+  int Dia;    
+  int Mes;   
+  int Year;    
+
+  int8_t Dia_Semana;
+  String Dia_de_Semana;
+
+  int  Hora_Alarma;
+  int  Minuto_Alarma;
+  bool Activar_Alarma  = false; 
+  bool Luz_de_Fondo    = true; 
+  int  Zumbador_Alarma = 13;     // Pin para conectar Zumbador (Alarma)
+  int  Luz_Fondo       = 1;      // Pin para conectar Anodo del LCD (Pin positivo) para luz de fondo
+
+  uint32_t Interv_parpadeo       = 500;               
+  uint32_t Parpadeo_ates_Millis  = 0;              
+  boolean  Estado_parpadeo       = false;           
+  boolean  Pres_Larga_Pulsador   = false;
+
+  byte Simbolo_Campana[8] = {
+        B00100,
+        B01110,
+        B01110,
+        B01110,
+        B01110,
+        B11111,
+        B00000,
+        B00100};
+
+  byte Letra_A[8] = {
+        0b11111,
+        0b11111,
+        0b11011,
+        0b11111,
+        0b11111,
+        0b11011,
+        0b11011,
+        0b11011};        
+
+  byte Numero_2[8] = {
+        0b11111,
+        0b11111,
+        0b00011,
+        0b11111,
+        0b11111,
+        0b11000,
+        0b11111,
+        0b11111};
+
+  byte Letra_P[8] = {
+        0b11111,
+        0b11111,
+        0b11011,
+        0b11111,
+        0b11111,
+        0b11000,
+        0b11000,
+        0b11000};      
+
+  byte Simbolo_Derecha[8] = {
+        B10000,
+        B11000,
+        B11100,
+        B11110,
+        B11100,
+        B11000,
+        B10000,
+        B00000};  
+
+  byte Simbolo_Izquierda[8] = {
+        B00001,
+        B00011,
+        B00111,
+        B01111,
+        B00111,
+        B00011,
+        B00001,
+        B00000};                
+        
+  byte Simbolo_Termometro[8] = {
+        B00100,
+        B01010,
+        B01010,
+        B01110,
+        B01110,
+        B11111,
+        B11111,
+        B01110};
+        
+
+ void setup()
+   {
+    lcd.begin(16,2);  
+    
+    Wire.begin();                     
+    pinMode(Zumbador_Alarma, OUTPUT);
+    pinMode(Luz_Fondo,       OUTPUT);
+
+    lcd.createChar(1, Simbolo_Campana);
+    lcd.createChar(2, Letra_A);
+    lcd.createChar(3, Numero_2);
+    lcd.createChar(4, Letra_P);
+    lcd.createChar(5, Simbolo_Derecha);
+    lcd.createChar(6, Simbolo_Izquierda);
+    lcd.createChar(7, Simbolo_Termometro);
+
+    Wire.begin();
+
+    setSyncProvider(RTC.get);               // establecer RTC como el proveedor de sincronización
+    setSyncInterval(5);                     // Tiempo en segundos de sincronización con RTC
+
+    //Deshabilita la onda cuadrada por defecto del pin SQW
+    RTC.squareWave(SQWAVE_NONE);
+
+    //Adjuntar una interrupción en la caída del pin SQW
+    //digitalWrite(SQW_PIN, HIGH);    //Redundante con la siguiente linea
+    pinMode(SQW_PIN, INPUT_PULLUP);
+    attachInterrupt(INT0, Func_Alarma, FALLING);
+
+    lcd.clear();
+    lcd.setCursor(6, 0); 
+    lcd.write(2);          // Letra_A
+    lcd.setCursor(7, 0); 
+    lcd.write(3);          // Numero 2
+    lcd.setCursor(8, 0); 
+    lcd.write(4);          // Letra_P
+    lcd.setCursor(0, 1); 
+    lcd.print("Arduino & DS3231"); 
+    delay(4000); 
+    lcd.clear();
+    
+    estado = PRINCIPAL;     // Estado Inicial de la maquina de Estado
+   }
+
+  volatile boolean Llamar_Alarma = false;
+
+   void Func_Alarma(){
+     Llamar_Alarma = true;}
+
+
+/**----------- LOOP -----------**/
+  void loop(){
+      Cambio_Estados();                // Cambio de Estado de la Maquina de Estado
+      Entrada_Pulsador();              // Verificar entrada de pulsadores
+    
+    if (Llamar_Alarma){
+      if (RTC.alarm(ALARM_1)) {
+          lcd.clear();
+          lcd.setCursor(3,0);
+          lcd.print("Levantate!");
+          lcd.setCursor(3,1);
+          lcd.print("Levantate!");
+          
+    for(int i=0;i<25; i++){
+        Pulsa_Atras.read();
+     if (Pulsa_Atras.wasPressed()){
+        Llamar_Alarma = false;  
+        break;}
+        On_Luz_Zumbador();}}  
+        lcd.clear();}
+
+        Llamar_Alarma = false;
+  }
+
+
+
+/*---------------- Maquina de Estado ----------------*/
+  void Cambio_Estados(){
+    //Estados
+    switch (estado){
+      case PRINCIPAL:
+      Tiempo_en_LCD();
+      Fecha_en_LCD();
+      Obtener_Alarma();     // Leer Hora de la alarma almacenada en la EEPROM
+      Termometro_en_LCD();
+      Luz_Apag_Encen();
+      break;
+    
+      case SEL_MENU_ALARMA:
+      sel_menu_alarma();
+      break;
+    
+      case SEL_MENU_HORA:
+      sel_menu_hora();
+      break;
+    
+      case SEL_MENU_FECHA:
+      sel_menu_fecha();
+      break;
+      
+      case MENU_LUZ_FONDO:
+      sel_menu_luz();
+      break;
+      
+      case SEL_HORA:
+      sel_tiempo_LCD();
+      break;
+      
+      case SEL_MINUTOS:
+      sel_tiempo_LCD();
+      break;
+      
+      case SEL_DIAS:
+      sel_fecha_LCD();
+      break;
+      
+      case SEL_MES:
+      sel_fecha_LCD();
+      break;
+      
+      case SEL_YEAR:
+      sel_fecha_LCD();
+      break;
+      
+      case SEL_HORA_ALARMA:
+      sel_tiempo_alarma_LCD();
+      break;
+    
+      case SEL_MINUTO_ALARMA:
+      sel_tiempo_alarma_LCD();
+      break;
+    
+      case SEL_ON_OFF_ALARMA:
+      sel_tiempo_alarma_LCD();
+      break; 
+      
+      case SEL_LUZ_FONDO:
+      sel_luz_LCD(); 
+      break;
+      
+      case TIEMPO_ALARMA:
+      Alarma_en_LCD();
+      delay(2000);
+      lcd.clear();
+      estado=PRINCIPAL;
+      break; 
+      break;
+   }
+ }
+
+/* ------------ Comprobar las entradas -------------*/
+    void Entrada_Pulsador(){   //Chequear estado de los pulsadores
+      Pulsa_Arriba.read();                      
+      Pulsa_Abajo.read();                    
+      Pulsa_Selector.read();                  
+      Pulsa_Atras.read();
+
+     
+    switch (Pulsa_Selector.wasPressed()){      // Chequear estado del pulsadores MENU_SELECTOR
+     case 1:
+      Pulsador = Pulsador_Menu;      
+      Transicion(Pulsador);
+      break; }
+       
+    switch (Pulsa_Arriba.wasPressed()){        // Chequear estado del pulsadores ARRIBA
+     case 1:
+      Pulsador = Pulsador_Arriba;
+      Transicion(Pulsador);
+      break;}
+
+    switch (Pulsa_Arriba.wasReleased()){             //Chequear si el pulsadores ARRIBA se mantiene presionado
+     case 1:
+      Pres_Larga_Pulsador = false;
+      Repeticion = Primera_Repeticion;
+      break; }
+
+    switch (Pulsa_Arriba.pressedFor(Repeticion)) {               
+     case 1:
+      Repeticion += Repetir_Increment;               //Incrementar el intervalo de pulsacion larga
+      Pres_Larga_Pulsador = true;
+      Pulsador = Pulsador_Arriba;
+      Transicion(Pulsador);
+      break;}
+    
+    switch (Pulsa_Abajo.wasPressed())  {            //Chequear estado del pulsadores ABAJO
+     case 1:
+      Pulsador = Pulsador_Abajo;
+      Transicion(Pulsador);
+      break; }
+
+    switch (Pulsa_Abajo.wasReleased()) {            //Chequear si el pulsadores ABAJO se mantiene presionado
+     case 1:
+      Pres_Larga_Pulsador = false;
+      Repeticion = Primera_Repeticion;
+      break; }
+
+    switch (Pulsa_Abajo.pressedFor(Repeticion)) {               
+     case 1:
+      Repeticion += Repetir_Increment;               //Incrementar el intervalo de pulsacion larga
+      Pres_Larga_Pulsador = true;
+      Pulsador = Pulsador_Abajo;
+      Transicion(Pulsador);
+      break; }
+    
+    switch (Pulsa_Atras.wasPressed()) {              //Chequear estado del pulsadores ATRAS
+     case 1:
+      Pulsador = Pulsador_Atras;
+      Transicion(Pulsador);
+      break; }}
+
+
+/* ------------ Transiciones de Estados -------------*/
+   void Transicion(int Presionar){
+     switch (estado){
+       case PRINCIPAL:
+        if (Presionar == Pulsador_Menu){
+            lcd.clear();
+            estado = SEL_MENU_ALARMA;}
+        else if (Presionar == Pulsador_Atras){
+            lcd.clear();
+            estado = TIEMPO_ALARMA; }
+            break;
+            
+       case SEL_MENU_ALARMA:
+         if (Presionar == Pulsador_Arriba){
+            lcd.clear();
+            estado = SEL_MENU_HORA;}
+         else if (Presionar == Pulsador_Arriba){
+            lcd.clear();
+            estado = SEL_MENU_FECHA; }
+         else if (Presionar == Pulsador_Arriba){
+            lcd.clear();
+            estado = MENU_LUZ_FONDO; } 
+         if (Presionar == Pulsador_Menu){
+            lcd.clear();
+            estado = SEL_HORA_ALARMA; }
+         if (Presionar == Pulsador_Atras) {
+            lcd.clear();
+            estado = PRINCIPAL; }
+            break;
+
+      case SEL_MENU_HORA:
+         if (Presionar == Pulsador_Arriba) {
+            lcd.clear();
+            estado = SEL_MENU_FECHA;}
+         else if (Presionar == Pulsador_Arriba){
+            lcd.clear();
+            estado = MENU_LUZ_FONDO; } 
+   
+         if (Presionar == Pulsador_Abajo){
+            lcd.clear();
+            estado = SEL_MENU_ALARMA; }
+    
+         if (Presionar == Pulsador_Menu) {
+            lcd.clear();
+            estado = SEL_HORA; }
+            
+         if (Presionar == Pulsador_Atras) {
+            lcd.clear();
+            estado = PRINCIPAL; }
+            break; 
+
+      case SEL_MENU_FECHA: 
+         if (Presionar == Pulsador_Arriba){
+            lcd.clear();
+            estado = MENU_LUZ_FONDO; } 
+         if (Presionar == Pulsador_Abajo) {
+           lcd.clear();
+           estado = SEL_MENU_HORA;     }
+         else if (Presionar == Pulsador_Abajo) {
+           lcd.clear();
+           estado = SEL_MENU_ALARMA; }
+  
+         if (Presionar == Pulsador_Menu)  {
+           lcd.clear();
+           estado = SEL_DIAS; }
+           
+         if (Presionar == Pulsador_Atras) {
+           lcd.clear();
+           estado = PRINCIPAL; }
+           break;
+           
+      case MENU_LUZ_FONDO: 
+        if (Presionar == Pulsador_Abajo){
+           lcd.clear();
+           estado = SEL_MENU_FECHA;}     
+        else if (Presionar == Pulsador_Abajo) {
+           lcd.clear();
+           estado = SEL_MENU_HORA; }
+        else if (Presionar == Pulsador_Abajo) {
+           lcd.clear();
+           estado = SEL_MENU_ALARMA; }
+        if (Presionar == Pulsador_Menu)  {
+           lcd.clear();
+           estado = SEL_LUZ_FONDO; }    
+        if (Presionar == Pulsador_Atras) {
+           lcd.clear();
+           estado = PRINCIPAL; }
+           break;      
+       
+      case SEL_HORA:
+         if (Presionar == Pulsador_Arriba) {
+            Hora++; 
+         if (Hora>23) 
+            Hora = 0; }
+         else if (Presionar == Pulsador_Abajo) {
+            Hora--; 
+         if (Hora<0) 
+            Hora = 23; }
+         if (Presionar == Pulsador_Menu) {
+            estado = SEL_MINUTOS;  }
+            break;
+            
+      case SEL_MINUTOS:
+         if (Presionar == Pulsador_Arriba){
+            Minuto++; 
+         if (Minuto>59) 
+            Minuto = 0; }
+         else if (Presionar == Pulsador_Abajo) {
+            Minuto--; 
+         if (Minuto<0) 
+            Minuto = 59; }
+
+         if (Presionar == Pulsador_Atras) {
+            estado = SEL_HORA; }
+         if (Presionar == Pulsador_Menu) {
+            Selec_Tiempo();
+            lcd.clear(); 
+            lcd.setCursor(1,0);
+            lcd.print("Hora Seleccionada");
+            delay(1000);
+            lcd.clear();
+            estado = PRINCIPAL; }
+            break;
+         
+      case SEL_DIAS:
+         if (Presionar == Pulsador_Arriba) {
+             Dia++; 
+         if (Dia>31) 
+             Dia = 1; }
+         else if (Presionar == Pulsador_Abajo) {
+             Dia--; 
+         if (Dia<1) 
+             Dia = 31; }
+         if (Presionar == Pulsador_Menu) {
+             estado = SEL_MES;  }
+             break;
+        
+       case SEL_MES:
+         if (Presionar == Pulsador_Arriba) {
+            Mes++; 
+         if (Mes>12) 
+            Mes = 1; }
+         else if (Presionar == Pulsador_Abajo) {
+            Mes--; 
+         if (Mes<1) 
+            Mes = 12; }
+         if (Presionar == Pulsador_Menu) {
+            estado = SEL_YEAR; }
+         if (Presionar == Pulsador_Atras) {
+            estado = SEL_DIAS; }
+            break;
+            
+       case SEL_YEAR:
+         if (Presionar == Pulsador_Arriba) {
+            Year++; 
+         if (Year>99) 
+            Year = 0; }
+         else if (Presionar == Pulsador_Abajo) {
+            Year--; 
+         if (Year<0) 
+            Year = 99; }
+         if (Presionar == Pulsador_Atras) {
+            estado = SEL_MES; }
+         if (Presionar == Pulsador_Menu) {
+            Selec_Fecha();
+            lcd.clear();
+            lcd.setCursor(0,0);
+            lcd.print("Fecha ");
+            lcd.setCursor(0,1);
+            lcd.print("Seleccionada");
+            delay(1000);
+            lcd.clear();
+            estado = PRINCIPAL; }
+            break;
+
+      case SEL_HORA_ALARMA:
+         if (Presionar == Pulsador_Arriba) {
+            Hora_Alarma++; 
+         if (Hora_Alarma>23) 
+            Hora_Alarma = 0; }
+         else if (Presionar == Pulsador_Abajo) {
+            Hora_Alarma--; 
+         if (Hora_Alarma<0) 
+            Hora_Alarma = 23;  }
+         if (Presionar == Pulsador_Menu) {
+            estado = SEL_MINUTO_ALARMA; }
+            break;
+
+      case SEL_MINUTO_ALARMA:
+         if (Presionar == Pulsador_Arriba) {
+            Minuto_Alarma++; 
+         if (Minuto_Alarma>59) 
+            Minuto_Alarma = 0; }
+         else if (Presionar == Pulsador_Abajo) {
+            Minuto_Alarma--; 
+         if (Minuto_Alarma<0) 
+            Minuto_Alarma = 59; }
+         if (Presionar == Pulsador_Menu) {
+            estado=SEL_ON_OFF_ALARMA;  }
+         if (Presionar == Pulsador_Atras) {
+            estado = SEL_HORA_ALARMA; }
+            break;
+
+      case SEL_ON_OFF_ALARMA:
+         if (Presionar == Pulsador_Arriba) {
+            Activar_Alarma = true; }
+         else if (Presionar == Pulsador_Abajo) {
+            Activar_Alarma =false; }
+         if (Presionar == Pulsador_Atras) {
+            estado = SEL_MINUTO_ALARMA; }
+         if (Presionar == Pulsador_Menu) {
+            Sel_Alarma();
+            lcd.clear(); 
+            lcd.setCursor(0,0);
+            lcd.print("Alarma Ajustada");
+            delay(1000);
+            lcd.clear();
+            estado = PRINCIPAL; }
+            break;
+         
+       case SEL_LUZ_FONDO: 
+         if (Presionar == Pulsador_Arriba) {
+            Luz_de_Fondo = true; }
+         else if (Presionar == Pulsador_Abajo) {
+            Luz_de_Fondo =false; }
+         if (Presionar == Pulsador_Menu) {
+            Luz_Apag_Encen();
+            lcd.clear(); 
+            lcd.setCursor(2,0);
+            lcd.print("Luz Ajustada    ");
+            delay(1000);
+            lcd.clear();
+            estado = PRINCIPAL; }
+            break;}}
+
+
+/*---------------- FUNCIONES ------------------*/
+   void On_Luz_Zumbador(){
+     digitalWrite(Zumbador_Alarma,HIGH);
+     digitalWrite(Luz_Fondo,HIGH);
+     delay(500);
+     digitalWrite(Zumbador_Alarma, LOW);
+     digitalWrite(Luz_Fondo,LOW);
+     delay(500);}
+ 
+   void sel_menu_hora(){
+     lcd.setCursor(6,0);
+     lcd.print("MENU");
+     lcd.setCursor(2,1);
+     lcd.print("Selec. Hora");
+     lcd.setCursor(15,1);
+     lcd.write(5);            // Simbolo Derecha
+     lcd.setCursor(0,1);
+     lcd.write(6); }          // Simbolo Izquierda
+
+   void sel_menu_fecha(){
+     lcd.setCursor(6,0);
+     lcd.print("MENU");
+     lcd.setCursor(2,1);
+     lcd.print("Selec. Fecha");
+     lcd.setCursor(15,1);
+     lcd.write(5);           // Simbolo Derecha
+     lcd.setCursor(0,1);
+     lcd.write(6); }         // Simbolo Izquierda
+
+   void sel_menu_alarma(){
+     lcd.setCursor(6,0);
+     lcd.print("MENU");
+     lcd.setCursor(1,1);
+     lcd.print("Selec. Alarma");
+     lcd.setCursor(15,1);
+     lcd.write(5); }        // Simbolo Derecha
+     
+   void sel_menu_luz(){ 
+     lcd.setCursor(6,0);
+     lcd.print("MENU");
+     lcd.setCursor(2,1);
+     lcd.print("Activar Luz");
+     lcd.setCursor(0,1);
+     lcd.write(6); }        // Simbolo Izquierda
+
+   void Tiempo_en_LCD() {
+     Obtener_Tiempo();
+     lcd.setCursor(0,0);
+     
+   switch(Hora){
+     case 1:  lcd.print("01");break; case 2: lcd.print("02");break; case 3: lcd.print("03");break; case 4: lcd.print("04");break; case 5: lcd.print("05");break;
+     case 6:  lcd.print("06");break; case 7: lcd.print("07");break; case 8: lcd.print("08");break; case 9: lcd.print("09");break; case 10: lcd.print("10");break;
+     case 11: lcd.print("11");break; case 12: lcd.print("12");break; case 13: lcd.print("01");break; case 14: lcd.print("02");break; case 15: lcd.print("03");break; 
+     case 16: lcd.print("04");break; case 17: lcd.print("05");break; case 18:  lcd.print("06");break; case 19: lcd.print("07");break; case 20: lcd.print("08");break; 
+     case 21: lcd.print("09");break; case 22: lcd.print("10");break; case 23:  lcd.print("11");break; case 00: lcd.print("12");break; }      
+     lcd.print(":");
+     
+     Posicion_en_LCD(Minuto);
+     
+      if (Hora==12 or Hora==13 or Hora==14 or Hora==15 or Hora==16 or Hora==17 or Hora==18 or Hora==19 or Hora==20 or Hora==21 or Hora==22 or Hora==23){
+         lcd.setCursor(6,0);
+         lcd.print("PM"); }
+      else{
+         lcd.setCursor(6,0);
+         lcd.print("AM"); }}
+         
+         
+   void Fecha_en_LCD(){
+     Obtener_Fecha();
+     lcd.setCursor(8,1);
+     Posicion_en_LCD(Dia);
+     lcd.print(" ");
+     lcd.setCursor(11,1);
+     
+   switch(Mes){
+     case 1:  lcd.print("Enero     ");break;
+     case 2:  lcd.print("Febrero   ");break;
+     case 3:  lcd.print("Marzo     ");break;
+     case 4:  lcd.print("Abril     ");break;
+     case 5:  lcd.print("Mayo      ");break;
+     case 6:  lcd.print("Junio     ");break;
+     case 7:  lcd.print("Julio     ");break;
+     case 8:  lcd.print("Agosto    ");break;
+     case 9:  lcd.print("Septiembre");break;
+     case 10: lcd.print("Octubre   ");break;
+     case 11: lcd.print("Noviembre ");break;
+     case 12: lcd.print("Diciembre ");break;  } 
+     
+      Dia_Semana= weekday(); 
+   switch(Dia_Semana){
+     case 1: Dia_de_Semana  = "Domingo"; break;
+     case 2: Dia_de_Semana  = "Lunes  "; break;
+     case 3: Dia_de_Semana  = "Martes "; break;
+     case 4: Dia_de_Semana  = "Miercol"; break;
+     case 5: Dia_de_Semana  = "Jueves "; break;
+     case 6: Dia_de_Semana  = "Viernes"; break;
+     case 7: Dia_de_Semana  = "Sabado "; break;}
+    lcd.setCursor(0,1);
+    lcd.print (Dia_de_Semana);}
+    
+
+   void sel_tiempo_LCD(){
+      lcd.setCursor(0,0);
+      lcd.print("Seleccionar Hora");
+    
+    switch (estado){
+      case SEL_HORA:
+         lcd.setCursor(10,1);
+         lcd.print("h");
+       if (Pres_Larga_Pulsador == false){
+       if (Estado_parpadeo == 0){
+         lcd.setCursor(4,1);
+         Posicion_en_LCD(Hora);}
+       else{
+         lcd.setCursor(4,1);
+         lcd.print("  ");}}
+       else{
+         lcd.setCursor(4,1);
+         Posicion_en_LCD(Hora);}
+         lcd.print(":");
+         Posicion_en_LCD(Minuto);
+        break;
+    
+    case SEL_MINUTOS:
+      lcd.setCursor(10,1);
+      lcd.print("m");
+      lcd.setCursor(4,1);
+      Posicion_en_LCD(Hora);
+      lcd.print(":");
+    if (Pres_Larga_Pulsador == false){
+    if (Estado_parpadeo == 0){
+       lcd.setCursor(7,1);
+    Posicion_en_LCD(Minuto); }
+     else{
+        lcd.setCursor(7,1);
+        lcd.print("  "); }}
+     else{
+        lcd.setCursor(7,1);
+        Posicion_en_LCD(Minuto); }
+        break; }
+        
+      unsigned long Parpadeo_Presente_Millis = millis();
+      if(Parpadeo_Presente_Millis - Parpadeo_ates_Millis > Interv_parpadeo){
+        Parpadeo_ates_Millis = Parpadeo_Presente_Millis;
+      if (Estado_parpadeo == 0){
+        Estado_parpadeo = 1; }
+      else{
+        Estado_parpadeo = 0; }}}
+
+        
+
+      void sel_fecha_LCD(){
+         lcd.setCursor(0,0);
+         lcd.print("Seleccio. Fecha:");
+        switch (estado) {
+          case SEL_DIAS:
+           if (Pres_Larga_Pulsador == false){
+           if (Estado_parpadeo == 0){
+             lcd.setCursor(4,1);
+             Posicion_en_LCD(Dia);  }
+           else{
+             lcd.setCursor(4,1);
+             lcd.print("  ");   }}
+           else{
+             lcd.setCursor(4,1);
+             Posicion_en_LCD(Dia); }
+             lcd.print("/");
+             Posicion_en_LCD(Mes);
+             lcd.print("/");
+             Posicion_en_LCD(Year);
+             break;
+    
+     case SEL_MES:
+        lcd.setCursor(4,1);
+        Posicion_en_LCD(Dia);
+        lcd.print("/");
+       if (Pres_Larga_Pulsador == false){
+       if (Estado_parpadeo == 0){
+          lcd.setCursor(7,1);
+          Posicion_en_LCD(Mes); }
+       else{
+          lcd.setCursor(7,1);
+          lcd.print("  ");    }}
+       else{
+          lcd.setCursor(7,1);
+          Posicion_en_LCD(Mes);}
+          lcd.print("/");
+          Posicion_en_LCD(Year);
+          break;
+    
+    case SEL_YEAR:
+        lcd.setCursor(4,1);
+        Posicion_en_LCD(Dia);
+        lcd.print("/");
+        Posicion_en_LCD(Mes);
+        lcd.print("/");
+      if (Pres_Larga_Pulsador == false){
+      if (Estado_parpadeo == 0){
+         lcd.setCursor(10,1);
+         Posicion_en_LCD(Year); }
+    else{
+         lcd.setCursor(10,1);
+         lcd.print("  ");  }}
+    else{
+         lcd.setCursor(10,1);
+         Posicion_en_LCD(Year);  }
+         break; }
+
+      unsigned long Parpadeo_Presente_Millis = millis();
+        if(Parpadeo_Presente_Millis - Parpadeo_ates_Millis > Interv_parpadeo){
+          Parpadeo_ates_Millis = Parpadeo_Presente_Millis;
+        if (Estado_parpadeo == 0){
+          Estado_parpadeo = 1; }
+        else{
+          Estado_parpadeo = 0;}}}
+
+       void sel_tiempo_alarma_LCD(){
+          lcd.setCursor(0,0);
+          lcd.print("Hora de Alarma: ");
+       if (Activar_Alarma==true){
+          lcd.setCursor(8,1);
+          lcd.print("Activada"); }
+       else{
+          lcd.setCursor(8,1);
+          lcd.print("Desactiv");}
+          
+       
+    switch (estado)  {
+      case SEL_HORA_ALARMA:
+        lcd.setCursor(6,1);
+        lcd.print("h");
+     if (Pres_Larga_Pulsador == false){
+     if (Estado_parpadeo == 0){
+        lcd.setCursor(0,1);
+        Posicion_en_LCD(Hora_Alarma);}
+    else{
+        lcd.setCursor(0,1);
+        lcd.print("  ");}}
+     else{
+        lcd.setCursor(0,1);
+        Posicion_en_LCD(Hora_Alarma); }
+        lcd.print(":");
+        Posicion_en_LCD(Minuto_Alarma);
+        break;
+    
+    case SEL_MINUTO_ALARMA:
+       lcd.setCursor(6,1);
+       lcd.print("m");
+       lcd.setCursor(0,1);
+       Posicion_en_LCD(Hora_Alarma);
+       lcd.print(":");
+    if (Pres_Larga_Pulsador == false){
+    if (Estado_parpadeo == 0){
+       lcd.setCursor(3,1);
+       Posicion_en_LCD(Minuto_Alarma); }
+    else{
+       lcd.setCursor(3,1);
+       lcd.print("  "); }}
+    else{
+       lcd.setCursor(3,1);
+       Posicion_en_LCD(Minuto_Alarma);}
+       break;
+    
+    case SEL_ON_OFF_ALARMA:
+       lcd.setCursor(3,1); 
+       Posicion_en_LCD(Minuto_Alarma);
+    if (Activar_Alarma == true){
+    if (Estado_parpadeo == 0){
+       lcd.setCursor(8,1);
+       lcd.print("");
+       lcd.setCursor(8,1);
+       lcd.print("Activada");}
+    else{
+       lcd.setCursor(8,1);
+       lcd.print("        ");}}
+    else{
+    if (Estado_parpadeo == 0){
+       lcd.setCursor(8,1);
+       lcd.print("Desactiv"); }
+    else{
+       lcd.setCursor(8,1);
+       lcd.print("        ");  }}
+       break; }
+        
+    unsigned long Parpadeo_Presente_Millis = millis();
+     if(Parpadeo_Presente_Millis - Parpadeo_ates_Millis > Interv_parpadeo){
+        Parpadeo_ates_Millis = Parpadeo_Presente_Millis;
+     if (Estado_parpadeo == 0){
+        Estado_parpadeo = 1; }
+     else{
+        Estado_parpadeo = 0;}}}
+        
+     void sel_luz_LCD(){  
+          lcd.setCursor(2,0);
+          lcd.print("Luz de Fondo    ");
+       if (Luz_de_Fondo == true){
+          lcd.setCursor(3,1);
+          lcd.print("Encendida       ");}
+       else{
+          lcd.setCursor(3,1);
+          lcd.print(" Apagada        "); } }
+          
+     void Alarma_en_LCD(){
+        lcd.setCursor(0,0);
+        lcd.print(">@<< ALARMA >>@<");
+        lcd.setCursor(0,1);
+        Posicion_en_LCD(Hora_Alarma);
+        lcd.print(":");
+        lcd.setCursor(3,1);
+        Posicion_en_LCD(Minuto_Alarma);
+        lcd.setCursor(6,1);
+        lcd.print("h");
+   
+     if (Activar_Alarma == true){ 
+        lcd.setCursor(8,1);
+        lcd.print("");
+        lcd.setCursor(8,1);
+        lcd.print("Activada");}
+     else{
+        lcd.setCursor(8,1);
+        lcd.print("Desactiv"); }}
+
+    void Obtener_Tiempo(){
+       Wire.beginTransmission(0x68); 
+       Wire.write(0);                //Establecer el registro en 0
+       Wire.endTransmission();
+       Wire.requestFrom(0x68, 3);// 3 bytes (Seg, Min, Hora)
+       Segundo = bcd_a_Dec(Wire.read() & 0x7f);
+       Minuto  = bcd_a_Dec(Wire.read());
+       Hora    = bcd_a_Dec(Wire.read() & 0x3f); }
+  
+    void Obtener_Fecha(){
+       Wire.beginTransmission(0x68); 
+       Wire.write(4);                //Establecer registro en 3 (Dia)  
+       Wire.endTransmission();
+       Wire.requestFrom(0x68, 3); // 3 bytes (Dia, Mes, Año) - Obtener de la libreria Time.h
+       Dia  = bcd_a_Dec(Wire.read());
+       Mes  = bcd_a_Dec(Wire.read());
+       Year = bcd_a_Dec(Wire.read());}
+
+    void Selec_Tiempo(){
+       Wire.beginTransmission(0x68);
+       Wire.write(0x00); 
+       Segundo=0;
+       Wire.write(dec_a_Bcd(Segundo));
+       Wire.write(dec_a_Bcd(Minuto));
+       Wire.write(dec_a_Bcd(Hora));
+       Wire.write(0x00); 
+       Wire.endTransmission();}
+
+    void Selec_Fecha(){
+       Wire.beginTransmission(0x68);
+       Wire.write(4);
+       Wire.write(dec_a_Bcd(Dia));
+       Wire.write(dec_a_Bcd(Mes));
+       Wire.write(dec_a_Bcd(Year));
+       Wire.endTransmission();}
+
+    void Sel_Alarma(){                //Guardar la hora de la alarma en la EEPROM
+       EEPROM.write(0, Hora_Alarma);
+       EEPROM.write(1, Minuto_Alarma);
+       EEPROM.write(2, Activar_Alarma);
+
+       RTC.setAlarm(ALM1_MATCH_HOURS, 0, Minuto_Alarma, Hora_Alarma, 0);  //Segundo,minuto,Hora,0
+       RTC.alarm(ALARM_1);                                                
+   if (Activar_Alarma==true){
+       RTC.alarmInterrupt(ALARM_1, true); }
+   else{
+     RTC.alarmInterrupt(ALARM_1, false);  }}
+
+   void Obtener_Alarma(){               //Leer la hora almacenada desde la EEPROM
+        Hora_Alarma = EEPROM.read(0);
+    if (Hora_Alarma > 23) 
+        Hora_Alarma=0;
+        Minuto_Alarma = EEPROM.read(1);
+    if (Minuto_Alarma > 59) 
+        Minuto_Alarma=0;
+        Activar_Alarma = EEPROM.read(2);
+    if(Activar_Alarma == true){
+       lcd.setCursor(9,0);
+       lcd.write(1); }        // Simbolo Campana
+    else{
+       lcd.setCursor(9,0);
+       lcd.print(" "); }}
+
+    void Luz_Apag_Encen(){
+      if (Luz_de_Fondo == true){
+         digitalWrite(Luz_Fondo, HIGH);}
+      else{
+         digitalWrite(Luz_Fondo, LOW);}}
+         
+    void Termometro_en_LCD(){
+      int temp_C = RTC.temperature() / 4;
+        lcd.setCursor(11, 0);
+        lcd.write(7);         //Simbolo Termometro 
+        lcd.setCursor(12, 0);
+     if (temp_C<10){
+        lcd.print('0');}
+        lcd.print(temp_C);
+        lcd.print((char)223);
+        lcd.print("C"); }
+
+     byte dec_a_Bcd(byte val){
+     return ( (val/10*16) + (val%10) );}
+
+     byte bcd_a_Dec(byte val){
+     return ( (val/16*10) + (val%16) );}
+
+    void Posicion_en_LCD(int digitos){
+     if(digitos < 10)
+       lcd.print("0");
+       lcd.print(digitos);}
